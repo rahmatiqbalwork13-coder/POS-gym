@@ -101,7 +101,7 @@ export function UsersClient() {
                   <label className="text-sm font-medium">{label as string}</label>
                   <input
                     type={type as string}
-                    value={(form as Record<string, string>)[key as string]}
+                    value={(form as unknown as Record<string, string>)[key as string]}
                     onChange={e => setForm(f => f ? { ...f, [key as string]: e.target.value } : f)}
                     placeholder={placeholder as string}
                     className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
