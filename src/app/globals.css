@@ -1,26 +1,474 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Sora:wght@400;600;700;800&display=swap');
+
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   @theme — Daftarkan custom colors ke Tailwind v4 engine
+   agar bisa dipakai sebagai utility class (bg-*, text-*, dll.)
+   ============================================================ */
+@theme {
+  --color-background:             hsl(var(--background));
+  --color-foreground:             hsl(var(--foreground));
+  --color-card:                   hsl(var(--card));
+  --color-card-foreground:        hsl(var(--card-foreground));
+  --color-popover:                hsl(var(--popover));
+  --color-popover-foreground:     hsl(var(--popover-foreground));
+  --color-primary:                hsl(var(--primary));
+  --color-primary-foreground:     hsl(var(--primary-foreground));
+  --color-secondary:              hsl(var(--secondary));
+  --color-secondary-foreground:   hsl(var(--secondary-foreground));
+  --color-muted:                  hsl(var(--muted));
+  --color-muted-foreground:       hsl(var(--muted-foreground));
+  --color-accent:                 hsl(var(--accent));
+  --color-accent-foreground:      hsl(var(--accent-foreground));
+  --color-destructive:            hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border:                 hsl(var(--border));
+  --color-input:                  hsl(var(--input));
+  --color-ring:                   hsl(var(--ring));
+
+  /* Sidebar */
+  --color-sidebar:                      hsl(var(--sidebar));
+  --color-sidebar-foreground:           hsl(var(--sidebar-foreground));
+  --color-sidebar-primary:              hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground:   hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent:               hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground:    hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border:               hsl(var(--sidebar-border));
+  --color-sidebar-ring:                 hsl(var(--sidebar-ring));
+
+  /* Brand */
+  --color-brand-blue:         hsl(var(--brand-blue));
+  --color-brand-blue-light:   hsl(var(--brand-blue-light));
+  --color-brand-blue-dark:    hsl(var(--brand-blue-dark));
+  --color-brand-blue-navy:    hsl(var(--brand-blue-navy));
+  --color-brand-yellow:       hsl(var(--brand-yellow));
+  --color-brand-yellow-light: hsl(var(--brand-yellow-light));
+  --color-brand-yellow-dark:  hsl(var(--brand-yellow-dark));
+  --color-brand-sky:          hsl(var(--brand-sky));
+  --color-brand-sky-light:    hsl(var(--brand-sky-light));
+
+  /* Radius */
+  --radius-sm:  calc(var(--radius) - 4px);
+  --radius-md:  calc(var(--radius) - 2px);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  /* Font */
+  --font-sans:    'Plus Jakarta Sans', sans-serif;
+  --font-heading: 'Sora', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* ============================================================
+   DESIGN TOKENS — USC Brand (Biru Royal + Kuning Emas)
+   Shadcn/ui compatible HSL variables
+   ============================================================ */
 
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* — Backgrounds — */
+    --background:        220 30% 97%;
+    --foreground:        224 45% 14%;
+
+    /* — Card & Surfaces — */
+    --card:              0 0% 100%;
+    --card-foreground:   224 45% 14%;
+    --popover:           0 0% 100%;
+    --popover-foreground: 224 45% 14%;
+
+    /* — Primary — Biru Royal USC — */
+    --primary:           224 68% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    /* — Secondary — Kuning Emas USC — */
+    --secondary:         44 96% 52%;
+    --secondary-foreground: 224 45% 14%;
+
+    /* — Muted — */
+    --muted:             220 25% 93%;
+    --muted-foreground:  224 20% 48%;
+
+    /* — Accent — Biru Langit — */
+    --accent:            210 80% 56%;
+    --accent-foreground: 0 0% 100%;
+
+    /* — Destructive — */
+    --destructive:       0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* — Border & Input — */
+    --border:            220 25% 86%;
+    --input:             220 25% 90%;
+    --ring:              224 68% 40%;
+
+    /* — Radius — */
+    --radius: 0.75rem;
+
+    /* — Sidebar (dipakai komponen Sidebar.tsx) — */
+    --sidebar:                    0 0% 100%;
+    --sidebar-foreground:         224 45% 14%;
+    --sidebar-primary:            224 68% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:             220 25% 93%;
+    --sidebar-accent-foreground:  224 45% 14%;
+    --sidebar-border:             220 25% 86%;
+    --sidebar-ring:               224 68% 40%;
+
+    /* — Custom Brand Tokens — */
+    --brand-blue:        224 68% 40%;
+    --brand-blue-light:  224 70% 94%;
+    --brand-blue-dark:   224 68% 25%;
+    --brand-blue-navy:   224 60% 15%;
+    --brand-yellow:      44 96% 52%;
+    --brand-yellow-light: 44 96% 92%;
+    --brand-yellow-dark: 44 96% 38%;
+    --brand-sky:         210 80% 56%;
+    --brand-sky-light:   210 80% 93%;
+
+    /* — Gradients — */
+    --gradient-hero:     linear-gradient(135deg, hsl(224 68% 40%) 0%, hsl(210 80% 56%) 100%);
+    --gradient-gold:     linear-gradient(135deg, hsl(44 96% 52%) 0%, hsl(38 96% 62%) 100%);
+    --gradient-usc:      linear-gradient(135deg, hsl(224 68% 40%) 0%, hsl(44 96% 52%) 100%);
+    --gradient-mesh:
+      radial-gradient(at 15% 20%, hsl(224 68% 70% / 0.35) 0px, transparent 50%),
+      radial-gradient(at 85% 75%, hsl(44 96% 70% / 0.28) 0px, transparent 50%),
+      radial-gradient(at 60% 5%,  hsl(210 80% 75% / 0.22) 0px, transparent 40%);
+
+    /* — Shadows — */
+    --shadow-blue:   0 4px 24px hsl(224 68% 40% / 0.18);
+    --shadow-gold:   0 4px 24px hsl(44 96% 52% / 0.22);
+    --shadow-card:   0 2px 12px hsl(224 40% 20% / 0.08), 0 1px 3px hsl(224 40% 20% / 0.06);
+  }
+
+  /* ============================================================
+     DARK MODE
+     ============================================================ */
+  .dark {
+    --background:        224 40% 8%;
+    --foreground:        220 20% 92%;
+
+    --card:              224 38% 11%;
+    --card-foreground:   220 20% 92%;
+    --popover:           224 38% 11%;
+    --popover-foreground: 220 20% 92%;
+
+    --primary:           224 70% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:         44 92% 55%;
+    --secondary-foreground: 224 45% 10%;
+
+    --muted:             224 30% 16%;
+    --muted-foreground:  220 15% 55%;
+
+    --accent:            210 75% 60%;
+    --accent-foreground: 224 45% 10%;
+
+    --destructive:       0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:            224 28% 20%;
+    --input:             224 28% 18%;
+    --ring:              224 70% 58%;
+
+    --sidebar:                    224 38% 11%;
+    --sidebar-foreground:         220 20% 92%;
+    --sidebar-primary:            224 70% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:             224 30% 16%;
+    --sidebar-accent-foreground:  220 20% 92%;
+    --sidebar-border:             224 28% 20%;
+    --sidebar-ring:               224 70% 58%;
+
+    --brand-blue:        224 70% 58%;
+    --brand-blue-light:  224 50% 18%;
+    --brand-blue-dark:   224 70% 72%;
+    --brand-blue-navy:   224 60% 8%;
+    --brand-yellow:      44 92% 55%;
+    --brand-yellow-light: 44 60% 18%;
+    --brand-yellow-dark: 44 92% 68%;
+    --brand-sky:         210 75% 60%;
+    --brand-sky-light:   210 55% 18%;
+
+    --gradient-hero:     linear-gradient(135deg, hsl(224 70% 45%) 0%, hsl(210 75% 55%) 100%);
+    --gradient-gold:     linear-gradient(135deg, hsl(44 92% 50%) 0%, hsl(38 92% 58%) 100%);
+    --gradient-usc:      linear-gradient(135deg, hsl(224 70% 45%) 0%, hsl(44 92% 50%) 100%);
+    --gradient-mesh:
+      radial-gradient(at 15% 20%, hsl(224 68% 28% / 0.6) 0px, transparent 50%),
+      radial-gradient(at 85% 75%, hsl(44 96% 32% / 0.4) 0px, transparent 50%),
+      radial-gradient(at 60% 5%,  hsl(210 80% 32% / 0.35) 0px, transparent 40%);
+
+    --shadow-blue: 0 4px 24px hsl(224 70% 58% / 0.28);
+    --shadow-gold: 0 4px 24px hsl(44 92% 55% / 0.28);
+    --shadow-card: 0 2px 12px hsl(0 0% 0% / 0.35), 0 1px 3px hsl(0 0% 0% / 0.2);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+@layer base {
+  * { border-color: hsl(var(--border)); }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: var(--gradient-mesh);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+  }
+
+  #__next, #root, main {
+    position: relative;
+    z-index: 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  p  { line-height: 1.7; }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
 }
+
+/* ============================================================
+   COMPONENT UTILITIES
+   ============================================================ */
+@layer components {
+
+  /* — Gradient Text — */
+  .text-gradient-blue {
+    background: var(--gradient-hero);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-usc {
+    background: var(--gradient-usc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-gold {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* — Glass Card — */
+  .glass-card {
+    background: hsl(var(--card) / 0.75);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid hsl(var(--border) / 0.6);
+    box-shadow: var(--shadow-card);
+    border-radius: var(--radius);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .glass-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-blue);
+  }
+
+  /* — Pill Badge — */
+  .pill-blue {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold;
+    background: hsl(var(--brand-blue-light));
+    color: hsl(var(--brand-blue-dark));
+  }
+
+  .pill-yellow {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold;
+    background: hsl(var(--brand-yellow-light));
+    color: hsl(var(--brand-yellow-dark));
+  }
+
+  .pill-sky {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold;
+    background: hsl(var(--brand-sky-light));
+    color: hsl(var(--brand-blue-dark));
+  }
+
+  /* — Section Wrapper — */
+  .section {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24;
+  }
+
+  /* — Gradient Buttons — */
+  .btn-gradient {
+    @apply relative inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-white overflow-hidden transition-all duration-200;
+    background: var(--gradient-hero);
+    box-shadow: var(--shadow-blue);
+  }
+
+  .btn-gradient:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px hsl(224 68% 40% / 0.35);
+  }
+
+  .btn-gold {
+    @apply relative inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold overflow-hidden transition-all duration-200;
+    background: var(--gradient-gold);
+    color: hsl(var(--brand-blue-navy));
+    box-shadow: var(--shadow-gold);
+  }
+
+  .btn-gold:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px hsl(44 96% 52% / 0.40);
+  }
+
+  .btn-usc {
+    @apply relative inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-white overflow-hidden transition-all duration-200;
+    background: var(--gradient-usc);
+    box-shadow: var(--shadow-blue);
+  }
+
+  .btn-usc:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 32px hsl(224 68% 40% / 0.4);
+  }
+
+  /* — Navy Hero Card — */
+  .card-navy {
+    background: hsl(var(--brand-blue-navy));
+    color: hsl(220 20% 92%);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-blue);
+  }
+
+  /* — Gold Accent Bar — */
+  .accent-bar {
+    height: 4px;
+    width: 3rem;
+    background: var(--gradient-gold);
+    border-radius: 9999px;
+  }
+
+  /* — Divider dekoratif — */
+  .divider-gradient {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, hsl(var(--brand-blue)), hsl(var(--brand-yellow)), transparent);
+    border: none;
+    border-radius: 9999px;
+  }
+
+  /* — Noise texture — */
+  .noise-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    border-radius: inherit;
+  }
+}
+
+/* ============================================================
+   SHADCN OVERRIDES
+   ============================================================ */
+@layer components {
+  [data-slot="card"] {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: var(--shadow-card);
+  }
+  [data-slot="card"]:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-blue);
+  }
+  [data-slot="input"]:focus,
+  [data-slot="textarea"]:focus {
+    border-color: hsl(var(--primary)) !important;
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15) !important;
+  }
+  [data-slot="badge"] {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@layer utilities {
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-8px); }
+  }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(224 68% 40% / 0.4); }
+    50%       { box-shadow: 0 0 0 14px hsl(224 68% 40% / 0); }
+  }
+  @keyframes pulseGold {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(44 96% 52% / 0.5); }
+    50%       { box-shadow: 0 0 0 14px hsl(44 96% 52% / 0); }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% center; }
+    to   { background-position: 200% center; }
+  }
+
+  .animate-fade-in-up { animation: fadeInUp 0.5s ease forwards; }
+  .animate-float      { animation: float 4s ease-in-out infinite; }
+  .animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+  .animate-pulse-gold { animation: pulseGold 2s ease-in-out infinite; }
+
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--brand-blue)) 0%,
+      hsl(var(--brand-sky)) 30%,
+      hsl(var(--brand-yellow)) 60%,
+      hsl(var(--brand-blue)) 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 3s linear infinite;
+  }
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: hsl(var(--muted)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--primary) / 0.5); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary)); }
