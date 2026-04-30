@@ -92,22 +92,41 @@ export function UsersClient() {
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <div className="space-y-3">
-              {[
-                ['Nama Lengkap', 'full_name', 'text', 'Andi Santoso'],
-                ...(!form.id ? [['Email', 'email', 'email', 'kasir@koperasi.com']] : []),
-                ...(!form.id ? [['Password', 'password', 'password', '••••••••']] : []),
-              ].map(([label, key, type, placeholder]) => (
-                <div key={key as string} className="space-y-1.5">
-                  <label className="text-sm font-medium">{label as string}</label>
-                  <input
-                    type={type as string}
-                    value={(form as unknown as Record<string, string>)[key as string]}
-                    onChange={e => setForm(f => f ? { ...f, [key as string]: e.target.value } : f)}
-                    placeholder={placeholder as string}
-                    className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
-                  />
-                </div>
-              ))}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={form.full_name}
+                  onChange={e => setForm(f => f ? { ...f, full_name: e.target.value } : f)}
+                  placeholder="Andi Santoso"
+                  className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                />
+              </div>
+
+              {!form.id && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Email</label>
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={e => setForm(f => f ? { ...f, email: e.target.value } : f)}
+                      placeholder="kasir@koperasi.com"
+                      className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Password</label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      onChange={e => setForm(f => f ? { ...f, password: e.target.value } : f)}
+                      placeholder="••••••••"
+                      className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Role</label>
