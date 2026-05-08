@@ -6,12 +6,16 @@ export interface Profile {
   role: Role
 }
 
+export type Category = 'Minuman' | 'Makanan' | 'Snack' | 'Suplemen' | 'Protein' | 'Perlengkapan' | 'Lainnya'
+
 export interface Item {
   id: string
   name: string
   purchase_price: number
   selling_price: number
   stock: number
+  category: Category
+  image_url: string | null
   created_at: string
 }
 
@@ -20,6 +24,8 @@ export interface ItemPublic {
   name: string
   selling_price: number
   stock: number
+  category: Category
+  image_url: string | null
 }
 
 export interface CartItem {
@@ -32,6 +38,9 @@ export interface Transaction {
   cashier_id: string
   total_amount: number
   total_laba_kotor: number
+  payment_method: 'cash' | 'transfer'
+  amount_paid?: number
+  change_amount?: number
   created_at: string
 }
 
@@ -68,3 +77,22 @@ export interface SessionUser {
   role: Role
   full_name: string | null
 }
+
+export interface AuditLog {
+  id: string
+  user_id: string
+  action: string
+  table_name: string
+  record_id: string | null
+  old_data: Record<string, unknown> | null
+  new_data: Record<string, unknown> | null
+  ip_address: string | null
+  created_at: string
+}
+
+export type AuditAction = 
+  | 'CREATE_TRANSACTION' 
+  | 'CREATE_ITEM' 
+  | 'UPDATE_ITEM' 
+  | 'DELETE_ITEM' 
+  | 'UPDATE_STOCK'

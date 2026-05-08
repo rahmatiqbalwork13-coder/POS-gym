@@ -1,22 +1,109 @@
 'use client'
-import { useState, useCallback } from 'react'
-import { Printer, ShoppingBag, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { ItemSearch } from '@/components/pos/ItemSearch'
-import { Cart } from '@/components/pos/Cart'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { 
+  ShoppingCart, 
+  Keyboard, 
+  Store,
+  Clock,
+  User
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { printThermalUSB } from '@/lib/printer/thermal-usb'
-import type { CartItem } from '@/types'
+import { ProductCard } from '@/components/pos/ProductCard'
+import { CategoryFilter } from '@/components/pos/CategoryFilter'
+import { CartPanel } from '@/components/pos/CartPanel'
+import { SearchBar } from '@/components/pos/SearchBar'
+import type { ItemPublic, CartItem, Category } from '@/types'
 
 export default function CashierPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  
+  // Products state
+  const [products, setProducts] = useState<ItemPublic[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<ItemPublic[]>([])
+  const [categories, setCategories] = useState<{ category: Category; count: number }[]>([])
+  const [selectedCategory, setSelectedCategory] = useState('Semua')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [productsLoading, setProductsLoading] = useState(true)
+  
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 4000)
   }
 
+  // Load products
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setProductsLoading(true)
+        console.log('[Cashier] Loading products...')
+        
+        // Get all items with stock > 0
+        const { data: items, error } = await supabase
+          .from('items')
+          .select('id, name, selling_price, stock, category, image_url')
+          .gt('stock', 0)
+          .order('name')
+
+        if (error) {
+          console.error('[Cashier] Error loading products:', error)
+          showToast('Gagal memuat produk: ' + error.message, 'error')
+        } else {
+          console.log('[Cashier] Loaded items:', items)
+          const productsData = (items as ItemPublic[]) || []
+          setProducts(productsData)
+          setFilteredProducts(productsData)
+          
+          // Calculate categories
+          const categoryCounts = productsData.reduce((acc, item) => {
+            const cat = item.category || 'Lainnya'
+            acc[cat] = (acc[cat] || 0) + 1
+            return acc
+          }, {} as Record<string, number>)
+          
+          const cats = Object.entries(categoryCounts)
+            .map(([category, count]) => ({ category: category as Category, count }))
+            .sort((a, b) => b.count - a.count)
+          
+          setCategories(cats)
+        }
+      } catch (err) {
+        console.error('[Cashier] Unexpected error:', err)
+        showToast('Terjadi kesalahan saat memuat produk', 'error')
+      } finally {
+        setProductsLoading(false)
+      }
+    }
+    
+    loadProducts()
+  }, [supabase])
+
+  // Filter products by category and search
+  useEffect(() => {
+    let filtered = products
+    
+    // Filter by category
+    if (selectedCategory !== 'Semua') {
+      filtered = filtered.filter(p => p.category === selectedCategory)
+    }
+    
+    // Filter by search
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+    
+    setFilteredProducts(filtered)
+  }, [selectedCategory, searchQuery, products])
+
+  // Cart handlers
   const handleAdd = useCallback((incoming: CartItem) => {
     setCart(prev => {
       const existing = prev.find(c => c.item.id === incoming.item.id)
@@ -37,9 +124,61 @@ export default function CashierPage() {
     setCart(prev => prev.filter(c => c.item.id !== itemId))
   }, [])
 
-  const total = cart.reduce((sum, c) => sum + c.item.selling_price * c.qty, 0)
+  const handleClear = useCallback(() => {
+    setCart([])
+    showToast('Keranjang dikosongkan', 'success')
+  }, [])
 
-  const handleCheckout = async () => {
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        if (e.key !== 'F5' && e.key !== 'Escape' && e.key !== 'F6') return
+      }
+
+      switch (e.key) {
+        case 'F1':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'F2':
+          e.preventDefault()
+          if (cart.length > 0) {
+            const lastItem = cart[cart.length - 1]
+            if (lastItem.qty < lastItem.item.stock) {
+              handleQtyChange(lastItem.item.id, lastItem.qty + 1)
+            }
+          }
+          break
+        case 'F3':
+          e.preventDefault()
+          if (cart.length > 0) {
+            const lastItem = cart[cart.length - 1]
+            handleRemove(lastItem.item.id)
+          }
+          break
+        case 'F6':
+          e.preventDefault()
+          setShowShortcuts(prev => !prev)
+          break
+        case 'Delete':
+          if (e.ctrlKey && cart.length > 0) {
+            e.preventDefault()
+            handleClear()
+          }
+          break
+        case 'Escape':
+          if (showShortcuts) setShowShortcuts(false)
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [cart, handleQtyChange, handleRemove, handleClear, showShortcuts])
+
+  // Checkout handler
+  const handleCheckout = async (paymentMethod: 'cash' | 'transfer', amountPaid?: number) => {
     if (cart.length === 0) return
     setLoading(true)
 
@@ -47,7 +186,11 @@ export default function CashierPage() {
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: cart }),
+        body: JSON.stringify({ 
+          items: cart,
+          payment_method: paymentMethod,
+          amount_paid: amountPaid
+        }),
       })
       const data = await res.json()
 
@@ -56,7 +199,7 @@ export default function CashierPage() {
         return
       }
 
-      // Attempt USB print (non-blocking — transaction already saved)
+      // Print receipt
       try {
         await printThermalUSB({
           storeName: 'Koperasi Gym',
@@ -69,77 +212,225 @@ export default function CashierPage() {
           })),
           total: data.totalAmount,
         })
+        showToast('Transaksi berhasil dan struk dicetak!', 'success')
       } catch (printerErr) {
         showToast(
-          `Transaksi berhasil! Printer error: ${printerErr instanceof Error ? printerErr.message : 'Printer tidak terkoneksi.'}`,
+          `Transaksi berhasil! (Printer: ${printerErr instanceof Error ? printerErr.message : 'Error'})`,
           'success'
         )
-        setCart([])
-        return
       }
 
-      showToast('Transaksi berhasil dan struk dicetak!', 'success')
       setCart([])
+      // Reload products to update stock
+      window.location.reload()
     } finally {
       setLoading(false)
     }
   }
 
+  // Current time
+  const [currentTime, setCurrentTime] = useState(new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="border-b border-border px-6 py-4 flex items-center gap-2">
-        <ShoppingBag className="size-5 text-primary" />
-        <h1 className="font-semibold text-lg">Kasir</h1>
-      </div>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: search */}
-        <div className="flex-1 p-6 overflow-auto border-r border-border">
-          <div className="max-w-lg">
-            <p className="text-sm text-muted-foreground mb-3">Cari barang dan tambahkan ke keranjang</p>
-            <ItemSearch onAdd={handleAdd} />
-          </div>
-        </div>
-
-        {/* Right: cart + checkout */}
-        <div className="w-80 flex flex-col p-4 gap-4">
-          <div className="flex items-center justify-between">
-            <p className="font-medium text-sm">Keranjang</p>
-            {cart.length > 0 && (
-              <button onClick={() => setCart([])} className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1">
-                <Trash2 className="size-3" /> Kosongkan
-              </button>
-            )}
+      <header className="h-16 border-b border-border/50 bg-card/50 backdrop-blur-xl flex items-center justify-between px-6 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/25">
+                <Store className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="font-bold text-lg text-foreground">KASIR</h1>
+                <p className="text-xs text-muted-foreground">Proses transaksi penjualan</p>
+              </div>
+            </div>
           </div>
 
-          <Cart items={cart} onQtyChange={handleQtyChange} onRemove={handleRemove} />
-
-          <div className="border-t border-border pt-4 space-y-3">
-            <div className="flex justify-between text-sm font-semibold">
-              <span>Total</span>
-              <span>Rp{total.toLocaleString('id-ID')}</span>
+          <div className="flex items-center gap-6">
+            {/* Time */}
+            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span className="font-mono">
+                {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
             </div>
 
-            <Button
-              size="lg"
-              className="w-full gap-2"
-              disabled={cart.length === 0 || loading}
-              onClick={handleCheckout}
+            {/* Keyboard shortcut hint */}
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-muted-foreground 
+                       hover:text-foreground hover:bg-muted transition-colors"
             >
-              <Printer className="size-4" />
-              {loading ? 'Memproses...' : 'Bayar & Cetak Struk'}
-            </Button>
+              <Keyboard className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Shortcuts</span>
+              <kbd className="hidden md:inline px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">F6</kbd>
+            </button>
+
+            {/* User */}
+            <div className="flex items-center gap-3 pl-6 border-l border-border/50">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                <User className="w-4 h-4 text-primary" />
+              </div>
+              <div className="hidden md:block">
+                <p className="text-sm font-medium">Administrator</p>
+                <p className="text-xs text-muted-foreground">Kasir</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Products Area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Search and Filter */}
+            <div className="p-4 space-y-4 shrink-0">
+              <SearchBar 
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Cari produk..."
+                inputRef={searchInputRef}
+              />
+              
+              <CategoryFilter
+                categories={categories}
+                selected={selectedCategory}
+                onSelect={setSelectedCategory}
+              />
+            </div>
+
+            {/* Products Grid */}
+            <div className="flex-1 overflow-y-auto p-4 pt-0" style={{ minHeight: '400px' }}>
+              {productsLoading ? (
+                <div className="h-full flex items-center justify-center min-h-[400px]">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-10 h-10 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
+                    <p className="text-sm text-muted-foreground font-medium">Memuat produk...</p>
+                  </div>
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-8 min-h-[400px]">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-muted/80 to-muted/40 flex items-center justify-center mb-6">
+                    <ShoppingCart className="w-12 h-12 text-muted-foreground/40" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
+                    {searchQuery ? 'Produk tidak ditemukan' : 'Belum ada produk'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    {searchQuery 
+                      ? 'Coba kata kunci lain atau pilih kategori berbeda untuk mencari produk'
+                      : 'Silakan tambah produk terlebih dahulu di menu Admin → Stok Barang'
+                    }
+                  </p>
+                  {!searchQuery && (
+                    <button 
+                      onClick={() => window.location.href = '/items'}
+                      className="mt-6 px-6 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors"
+                    >
+                      Tambah Produk
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                  {filteredProducts.map((product, index) => (
+                    <div 
+                      key={product.id} 
+                      className="stagger-item"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      <ProductCard item={product} onAdd={handleAdd} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cart Panel */}
+          <div className="w-full sm:w-[400px] border-l border-border/50 bg-card/30 backdrop-blur-sm flex flex-col shrink-0">
+            <div className="p-4 h-full">
+              <CartPanel
+                items={cart}
+                onQtyChange={handleQtyChange}
+                onRemove={handleRemove}
+                onClear={handleClear}
+                onCheckout={handleCheckout}
+                loading={loading}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 max-w-sm rounded-lg px-4 py-3 text-sm shadow-lg text-white z-50 ${
-          toast.type === 'success' ? 'bg-green-600' : 'bg-destructive'
-        }`}>
-          {toast.msg}
+        <div 
+          className={`fixed bottom-6 right-6 max-w-sm rounded-xl px-4 py-3 text-sm shadow-2xl z-50 
+                     animate-slide-in backdrop-blur-xl border ${
+            toast.type === 'success' 
+              ? 'bg-emerald-500/95 text-white border-emerald-400/50' 
+              : 'bg-destructive/95 text-white border-destructive-foreground/50'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {toast.type === 'success' ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            {toast.msg}
+          </div>
+        </div>
+      )}
+
+      {showShortcuts && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-scale-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-bold text-xl flex items-center gap-2">
+                <Keyboard className="w-6 h-6 text-primary" />
+                Shortcut Keyboard
+              </h2>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {[
+                { key: 'F1', desc: 'Fokus ke pencarian barang' },
+                { key: 'F2', desc: 'Tambah qty item terakhir' },
+                { key: 'F3', desc: 'Hapus item terakhir' },
+                { key: 'F6', desc: 'Tampilkan shortcut ini' },
+                { key: 'Ctrl + Del', desc: 'Kosongkan keranjang' },
+                { key: 'Esc', desc: 'Tutup dialog ini' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
+                  <kbd className="px-3 py-1.5 bg-muted border border-border rounded-lg text-xs font-mono font-bold">
+                    {shortcut.key}
+                  </kbd>
+                  <span className="text-sm text-muted-foreground">{shortcut.desc}</span>
+                </div>
+              ))}
+            </div>
+            
+            <p className="mt-6 text-xs text-muted-foreground text-center">
+              Shortcut aktif saat tidak sedang mengetik di input
+            </p>
+          </div>
         </div>
       )}
     </div>

@@ -8,6 +8,9 @@ import {
   Users,
   BarChart3,
   LogOut,
+  Dumbbell,
+  ClipboardList,
+  Wallet
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/app/actions/auth'
@@ -23,33 +26,45 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'ketua'] },
   { label: 'Kasir', href: '/cashier', icon: ShoppingCart, roles: ['admin', 'ketua', 'staff'] },
-  { label: 'Stok Barang', href: '/items', icon: Package, roles: ['admin'] },
+  { label: 'Produk', href: '/items', icon: Package, roles: ['admin'] },
+  { label: 'Stoking', href: '/stock', icon: ClipboardList, roles: ['admin'] },
+  { label: 'Transaksi', href: '/transactions', icon: Wallet, roles: ['admin', 'ketua'] },
   { label: 'Laporan', href: '/reports', icon: BarChart3, roles: ['admin', 'ketua'] },
   { label: 'Pengguna', href: '/users', icon: Users, roles: ['admin'] },
 ]
 
-interface SidebarProps {
-  role: Role
-  fullName: string | null
-}
-
-export function Sidebar({ role, fullName }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname()
 
-  const visible = NAV_ITEMS.filter(item => item.roles.includes(role))
-
   return (
-    <aside className="flex flex-col w-56 shrink-0 border-r border-border bg-sidebar h-screen sticky top-0">
-      <div className="px-4 py-4 border-b border-border">
-        <p className="font-semibold text-sm text-sidebar-foreground">Koperasi Gym</p>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">{fullName ?? 'Pengguna'}</p>
-        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground mt-1 capitalize">
-          {role}
-        </span>
+    <aside className="flex flex-col w-64 shrink-0 border-r border-border/50 bg-card/80 backdrop-blur-xl h-screen sticky top-0">
+      {/* Logo */}
+      <div className="h-16 flex items-center gap-3 px-4 border-b border-border/50">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/25">
+          <Dumbbell className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h1 className="font-bold text-lg tracking-tight">GYMPOS</h1>
+          <p className="text-[10px] text-muted-foreground -mt-0.5">Koperasi Gym</p>
+        </div>
       </div>
 
+      {/* User Info */}
+      <div className="px-4 py-3 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+            <span className="text-sm font-bold text-primary">A</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm truncate">Administrator</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">ADMINISTRATOR</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-        {visible.map(item => {
+        {NAV_ITEMS.map(item => {
           const Icon = item.icon
           const active = pathname.startsWith(item.href)
           return (
@@ -57,27 +72,44 @@ export function Sidebar({ role, fullName }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
+                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 group relative overflow-hidden',
                 active
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground font-medium'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               )}
             >
-              <Icon className="size-4 shrink-0" />
-              {item.label}
+              {/* Active indicator */}
+              {active && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-full" />
+              )}
+              
+              <Icon className={cn(
+                "w-5 h-5 shrink-0 transition-transform duration-200",
+                active ? "scale-110" : "group-hover:scale-105"
+              )} />
+              <span>{item.label}</span>
+              
+              {/* Hover glow effect */}
+              {!active && (
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 
+                              opacity-0 group-hover:opacity-100 transition-opacity" />
+              )}
             </Link>
           )
         })}
       </nav>
 
-      <div className="px-2 pb-4">
+      {/* Logout */}
+      <div className="p-2 border-t border-border/50">
         <form action={logout}>
           <button
             type="submit"
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm 
+                     text-muted-foreground hover:text-destructive hover:bg-destructive/10 
+                     transition-all duration-200 group"
           >
-            <LogOut className="size-4 shrink-0" />
-            Keluar
+            <LogOut className="w-5 h-5 shrink-0 group-hover:scale-105 transition-transform" />
+            <span>Keluar</span>
           </button>
         </form>
       </div>

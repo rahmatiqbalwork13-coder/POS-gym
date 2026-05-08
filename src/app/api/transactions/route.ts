@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json() as { items: CartItem[] }
-  const { items } = body
+  const body = await request.json() as { items: CartItem[]; payment_method: 'cash' | 'transfer'; amount_paid?: number }
+  const { items, payment_method = 'cash', amount_paid } = body
 
   if (!items || items.length === 0) {
     return NextResponse.json({ error: 'Keranjang kosong.' }, { status: 400 })
@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
       cashier_id: user.id,
       total_amount: totalAmount,
       total_laba_kotor: totalLabaKotor,
+      payment_method: payment_method,
+      amount_paid: amount_paid,
     })
     .select('id')
     .single()
