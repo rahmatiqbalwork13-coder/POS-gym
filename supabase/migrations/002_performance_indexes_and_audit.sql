@@ -141,7 +141,7 @@ $$;
 
 
 -- 8. Function untuk cek RLS policies (untuk debugging)
-CREATE OR REPLACE FUNCTION get_policies_for_table(table_name TEXT)
+CREATE OR REPLACE FUNCTION get_policies_for_table(p_table_name TEXT)
 RETURNS TABLE (
   policy_name TEXT,
   permissive TEXT,
@@ -151,13 +151,13 @@ RETURNS TABLE (
   with_check TEXT
 ) LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT 
-    polname::TEXT as policy_name,
-    polpermissive::TEXT as permissive,
-    polroles::TEXT[] as roles,
-    polcmd::TEXT as cmd,
-    pg_get_expr(pol.qual, pol.polrelid)::TEXT as qual,
-    pg_get_expr(pol.with_check, pol.polrelid)::TEXT as with_check
-  FROM pg_policies pol
-  WHERE pol.tablename = table_name;
+    policyname::TEXT as policy_name,
+    permissive::TEXT as permissive,
+    roles::TEXT[] as roles,
+    cmd::TEXT as cmd,
+    qual::TEXT as qual,
+    with_check::TEXT as with_check
+  FROM pg_policies
+  WHERE tablename = p_table_name;
 $$;
 

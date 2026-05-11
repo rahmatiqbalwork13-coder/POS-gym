@@ -24,13 +24,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'ketua'] },
-  { label: 'Kasir', href: '/cashier', icon: ShoppingCart, roles: ['admin', 'ketua', 'staff'] },
-  { label: 'Produk', href: '/items', icon: Package, roles: ['admin'] },
-  { label: 'Stoking', href: '/stock', icon: ClipboardList, roles: ['admin'] },
-  { label: 'Transaksi', href: '/transactions', icon: Wallet, roles: ['admin', 'ketua'] },
-  { label: 'Laporan', href: '/reports', icon: BarChart3, roles: ['admin', 'ketua'] },
-  { label: 'Pengguna', href: '/users', icon: Users, roles: ['admin'] },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['superadmin', 'admin', 'ketua'] },
+  { label: 'Kasir', href: '/cashier', icon: ShoppingCart, roles: ['superadmin', 'admin', 'ketua', 'staff'] },
+  { label: 'Produk', href: '/items', icon: Package, roles: ['superadmin', 'admin'] },
+  { label: 'Stoking', href: '/stock', icon: ClipboardList, roles: ['superadmin', 'admin'] },
+  { label: 'Transaksi', href: '/transactions', icon: Wallet, roles: ['superadmin', 'admin', 'ketua'] },
+  { label: 'Laporan', href: '/reports', icon: BarChart3, roles: ['superadmin', 'admin', 'ketua'] },
+  { label: 'Pengguna', href: '/users', icon: Users, roles: ['superadmin', 'admin'] },
 ]
 
 export function Sidebar() {

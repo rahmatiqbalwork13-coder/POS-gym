@@ -12,8 +12,13 @@ interface UserRow {
   active: boolean
 }
 
-const ROLES: Role[] = ['admin', 'ketua', 'staff']
-const ROLE_LABELS: Record<Role, string> = { admin: 'Super Admin', ketua: 'Ketua', staff: 'Staff Kasir' }
+const ROLES: Role[] = ['superadmin', 'admin', 'ketua', 'staff']
+const ROLE_LABELS: Record<Role, string> = { 
+  superadmin: 'Super Admin', 
+  admin: 'Admin', 
+  ketua: 'Ketua', 
+  staff: 'Staff Kasir' 
+}
 
 interface FormState {
   id?: string

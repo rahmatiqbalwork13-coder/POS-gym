@@ -8,7 +8,6 @@ import {
   User
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { printThermalUSB } from '@/lib/printer/thermal-usb'
 import { ProductCard } from '@/components/pos/ProductCard'
 import { CategoryFilter } from '@/components/pos/CategoryFilter'
 import { CartPanel } from '@/components/pos/CartPanel'
@@ -196,41 +195,27 @@ export default function CashierPage() {
 
       if (!res.ok) {
         showToast(data.error ?? 'Transaksi gagal.', 'error')
-        return
+        throw new Error(data.error)
       }
 
-      // Print receipt
-      try {
-        await printThermalUSB({
-          storeName: 'Koperasi Gym',
-          cashierName: 'Kasir',
-          date: new Date().toLocaleString('id-ID'),
-          items: cart.map(c => ({
-            name: c.item.name,
-            qty: c.qty,
-            price: c.item.selling_price,
-          })),
-          total: data.totalAmount,
-        })
-        showToast('Transaksi berhasil dan struk dicetak!', 'success')
-      } catch (printerErr) {
-        showToast(
-          `Transaksi berhasil! (Printer: ${printerErr instanceof Error ? printerErr.message : 'Error'})`,
-          'success'
-        )
-      }
-
+      // Clear cart after successful transaction
       setCart([])
-      // Reload products to update stock
-      window.location.reload()
+      
+      // Reload products to update stock after a delay
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+      
+      return data
     } finally {
       setLoading(false)
     }
   }
 
-  // Current time
-  const [currentTime, setCurrentTime] = useState(new Date())
+  // Current time - client only to avoid hydration mismatch
+  const [currentTime, setCurrentTime] = useState<Date | null>(null)
   useEffect(() => {
+    setCurrentTime(new Date())
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
@@ -256,7 +241,7 @@ export default function CashierPage() {
             <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="w-4 h-4" />
               <span className="font-mono">
-                {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                {currentTime ? currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}
               </span>
             </div>
 
@@ -362,6 +347,8 @@ export default function CashierPage() {
                 onClear={handleClear}
                 onCheckout={handleCheckout}
                 loading={loading}
+                storeName="Koperasi Gym"
+                cashierName="Administrator"
               />
             </div>
           </div>

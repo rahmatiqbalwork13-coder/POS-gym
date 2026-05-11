@@ -131,9 +131,11 @@ $$;
 
 
 -- profiles: read own, admin reads all
+DROP POLICY IF EXISTS "profiles_read_own" ON profiles;
 CREATE POLICY "profiles_read_own" ON profiles
   FOR SELECT USING (id = auth.uid() OR get_my_role() = 'admin');
 
+DROP POLICY IF EXISTS "profiles_admin_write" ON profiles;
 CREATE POLICY "profiles_admin_write" ON profiles
   FOR ALL USING (get_my_role() = 'admin');
 
@@ -141,24 +143,29 @@ CREATE POLICY "profiles_admin_write" ON profiles
 -- items: all authenticated users can read selling info
 --        only admin can see purchase_price (enforced at API layer)
 --        RLS allows read for all, API+DAL enforce column restriction
+DROP POLICY IF EXISTS "items_authenticated_read" ON items;
 CREATE POLICY "items_authenticated_read" ON items
   FOR SELECT USING (auth.uid() IS NOT NULL);
 
+DROP POLICY IF EXISTS "items_admin_write" ON items;
 CREATE POLICY "items_admin_write" ON items
   FOR ALL USING (get_my_role() = 'admin');
 
 
 -- transactions: staff sees own, admin/ketua see all
+DROP POLICY IF EXISTS "transactions_read" ON transactions;
 CREATE POLICY "transactions_read" ON transactions
   FOR SELECT USING (
     cashier_id = auth.uid() OR get_my_role() IN ('admin', 'ketua')
   );
 
+DROP POLICY IF EXISTS "transactions_insert_authenticated" ON transactions;
 CREATE POLICY "transactions_insert_authenticated" ON transactions
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 
 -- transaction_items: follows transactions access
+DROP POLICY IF EXISTS "transaction_items_read" ON transaction_items;
 CREATE POLICY "transaction_items_read" ON transaction_items
   FOR SELECT USING (
     get_my_role() IN ('admin', 'ketua')
@@ -167,12 +174,14 @@ CREATE POLICY "transaction_items_read" ON transaction_items
     )
   );
 
+DROP POLICY IF EXISTS "transaction_items_insert" ON transaction_items;
 CREATE POLICY "transaction_items_insert" ON transaction_items
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 
 -- profit_distributions: admin and ketua only
 --   (purchase_price sensitivity: this table shows aggregate laba only)
+DROP POLICY IF EXISTS "profit_dist_read" ON profit_distributions;
 CREATE POLICY "profit_dist_read" ON profit_distributions
   FOR SELECT USING (get_my_role() IN ('admin', 'ketua'));
 

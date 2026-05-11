@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'ketua' | 'staff'
+export type Role = 'superadmin' | 'admin' | 'ketua' | 'staff'
 
 export interface Profile {
   id: string

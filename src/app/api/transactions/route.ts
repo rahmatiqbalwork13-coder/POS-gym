@@ -1,6 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import type { CartItem } from '@/types'
+import type { CartItem, Role } from '@/types'
+
+// Helper to check if user is superadmin
+async function isSuperadmin(serviceClient: Awaited<ReturnType<typeof createServiceClient>>, userId: string): Promise<boolean> {
+  const { data: profile } = await serviceClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single()
+  return profile?.role === 'superadmin'
+}
+
+export async function GET(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const limit = parseInt(searchParams.get('limit') || '50')
+  const offset = parseInt(searchParams.get('offset') || '0')
+
+  const serviceClient = await createServiceClient()
+
+  // Get user's role
+  const { data: profile } = await serviceClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  // Build query
+  let query = serviceClient
+    .from('transactions')
+    .select(`
+      *,
+      profiles:profiles!transactions_cashier_id_fkey(full_name)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+    .range(offset, offset + limit - 1)
+
+  // Staff can only see their own transactions
+  if (profile?.role === 'staff') {
+    query = query.eq('cashier_id', user.id)
+  }
+
+  const { data: transactions, error } = await query
+
+  if (error) {
+    return NextResponse.json({ error: 'Gagal mengambil data transaksi.' }, { status: 500 })
+  }
+
+  return NextResponse.json(transactions)
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -93,4 +149,128 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ transactionId: txn.id, totalAmount }, { status: 201 })
+}
+
+// DELETE - Only superadmin can delete transactions
+export async function DELETE(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const serviceClient = await createServiceClient()
+
+  // Check if user is superadmin
+  const superadmin = await isSuperadmin(serviceClient, user.id)
+  if (!superadmin) {
+    return NextResponse.json({ error: 'Hanya superadmin yang dapat menghapus transaksi.' }, { status: 403 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID transaksi diperlukan.' }, { status: 400 })
+  }
+
+  // Get transaction items first to restore stock
+  const { data: txItems } = await serviceClient
+    .from('transaction_items')
+    .select('item_id, qty')
+    .eq('transaction_id', id)
+
+  // Delete transaction (cascade will delete transaction_items and profit_distributions)
+  const { error } = await serviceClient
+    .from('transactions')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    return NextResponse.json({ error: 'Gagal menghapus transaksi.' }, { status: 500 })
+  }
+
+  // Restore stock for each item
+  if (txItems && txItems.length > 0) {
+    for (const item of txItems) {
+      await serviceClient.rpc('increment_stock', {
+        p_item_id: item.item_id,
+        p_qty: item.qty,
+      })
+    }
+  }
+
+  return NextResponse.json({ success: true })
+}
+
+// PUT - Only superadmin can edit transactions
+export async function PUT(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const serviceClient = await createServiceClient()
+
+  // Check if user is superadmin
+  const superadmin = await isSuperadmin(serviceClient, user.id)
+  if (!superadmin) {
+    return NextResponse.json({ error: 'Hanya superadmin yang dapat mengedit transaksi.' }, { status: 403 })
+  }
+
+  const body = await request.json() as {
+    id: string
+    payment_method?: 'cash' | 'transfer'
+    amount_paid?: number
+  }
+  const { id, payment_method, amount_paid } = body
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID transaksi diperlukan.' }, { status: 400 })
+  }
+
+  // Get current transaction to calculate change
+  const { data: currentTx } = await serviceClient
+    .from('transactions')
+    .select('total_amount')
+    .eq('id', id)
+    .single()
+
+  if (!currentTx) {
+    return NextResponse.json({ error: 'Transaksi tidak ditemukan.' }, { status: 404 })
+  }
+
+  // Build update object
+  const updateData: {
+    payment_method?: 'cash' | 'transfer'
+    amount_paid?: number
+    change_amount?: number
+  } = {}
+
+  if (payment_method !== undefined) {
+    updateData.payment_method = payment_method
+  }
+
+  if (amount_paid !== undefined) {
+    updateData.amount_paid = amount_paid
+    // Recalculate change
+    updateData.change_amount = amount_paid > 0 ? amount_paid - currentTx.total_amount : 0
+  }
+
+  // Update transaction
+  const { data: updated, error } = await serviceClient
+    .from('transactions')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: 'Gagal mengupdate transaksi.' }, { status: 500 })
+  }
+
+  return NextResponse.json(updated)
 }

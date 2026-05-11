@@ -9,9 +9,12 @@ import {
   Banknote,
   Receipt,
   X,
-  Package
+  Package,
+  Printer,
+  Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { printThermalUSB, formatReceiptHTML, printWindow, isWebSerialSupported } from '@/lib/printer/thermal-usb'
 import type { CartItem } from '@/types'
 
 interface CartPanelProps {
@@ -19,8 +22,10 @@ interface CartPanelProps {
   onQtyChange: (itemId: string, qty: number) => void
   onRemove: (itemId: string) => void
   onClear: () => void
-  onCheckout: (paymentMethod: 'cash' | 'transfer', amountPaid?: number) => void
+  onCheckout: (paymentMethod: 'cash' | 'transfer', amountPaid?: number) => Promise<void>
   loading: boolean
+  storeName?: string
+  cashierName?: string
 }
 
 export function CartPanel({ 
@@ -29,11 +34,15 @@ export function CartPanel({
   onRemove, 
   onClear, 
   onCheckout,
-  loading 
+  loading,
+  storeName = 'Koperasi Gym',
+  cashierName = 'Kasir'
 }: CartPanelProps) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash')
   const [amountPaid, setAmountPaid] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
+  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'success' | 'error'>('idle')
+  const [printMessage, setPrintMessage] = useState('')
 
   const total = items.reduce((sum, item) => sum + item.item.selling_price * item.qty, 0)
   const itemCount = items.reduce((sum, item) => sum + item.qty, 0)
@@ -41,18 +50,73 @@ export function CartPanel({
     ? parseInt(amountPaid.replace(/\D/g, '')) - total 
     : 0
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (items.length === 0) return
     
-    if (paymentMethod === 'cash') {
-      const paid = parseInt(amountPaid.replace(/\D/g, ''))
-      if (!paid || paid < total) {
-        return // Show error
-      }
-      onCheckout('cash', paid)
-    } else {
-      onCheckout('transfer')
+    const paid = paymentMethod === 'cash' ? parseInt(amountPaid.replace(/\D/g, '')) : undefined
+    if (paymentMethod === 'cash' && (!paid || paid < total)) {
+      setPrintMessage('Uang bayar tidak mencukupi')
+      setPrintStatus('error')
+      return
     }
+
+    try {
+      // First process the transaction
+      await onCheckout(paymentMethod, paid)
+      
+      // Then print receipt
+      setPrintStatus('printing')
+      setPrintMessage('Mencetak struk...')
+      
+      const result = await printThermalUSB({
+        storeName,
+        cashierName,
+        date: new Date().toLocaleString('id-ID'),
+        items: items.map(item => ({
+          name: item.item.name,
+          qty: item.qty,
+          price: item.item.selling_price
+        })),
+        total,
+        paymentMethod,
+        amountPaid: paid,
+        change: paid ? paid - total : 0
+      })
+      
+      setPrintStatus('success')
+      setPrintMessage(result.message)
+      
+      // Clear status after 3 seconds
+      setTimeout(() => {
+        setPrintStatus('idle')
+        setPrintMessage('')
+      }, 3000)
+    } catch (error) {
+      setPrintStatus('error')
+      setPrintMessage(error instanceof Error ? error.message : 'Gagal mencetak struk')
+    }
+  }
+
+  const handlePrintPreview = () => {
+    if (items.length === 0) return
+    
+    const paid = paymentMethod === 'cash' ? parseInt(amountPaid.replace(/\D/g, '')) : undefined
+    const html = formatReceiptHTML({
+      storeName,
+      cashierName,
+      date: new Date().toLocaleString('id-ID'),
+      items: items.map(item => ({
+        name: item.item.name,
+        qty: item.qty,
+        price: item.item.selling_price
+      })),
+      total,
+      paymentMethod,
+      amountPaid: paid,
+      change: paid ? paid - total : 0
+    })
+    
+    printWindow(html)
   }
 
   const formatCurrency = (value: string) => {
@@ -258,26 +322,92 @@ export function CartPanel({
         </div>
 
         {/* Checkout Button */}
-        <Button
-          size="lg"
-          className="w-full h-14 text-base font-bold bg-gradient-to-r from-primary to-primary/90 
-                   hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/25
-                   transition-all hover:scale-[1.02] active:scale-[0.98]"
-          disabled={loading || (paymentMethod === 'cash' && (!amountPaid || change < 0))}
-          onClick={handleCheckout}
-        >
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Memproses...
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Receipt className="w-5 h-5" />
-              Proses Transaksi
-            </span>
-          )}
-        </Button>
+            {/* Print Status */}
+            {printStatus !== 'idle' && (
+              <div className={`p-3 rounded-xl text-sm ${
+                printStatus === 'success' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                printStatus === 'error' ? 'bg-red-500/10 text-red-600 border border-red-500/20' :
+                'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {printStatus === 'printing' && <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />}
+                  {printStatus === 'success' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+                  {printStatus === 'error' && <X className="w-4 h-4" />}
+                  <span>{printMessage}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Browser Support Warning */}
+            {!isWebSerialSupported() && (
+              <div className="p-3 rounded-xl text-xs bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                <p className="font-medium mb-1">💡 Tips Cetak Struk:</p>
+                <p>Browser ini tidak mendukung printer USB thermal. Gunakan Chrome atau Edge untuk fitur print otomatis. Struk akan otomatis diunduh sebagai file teks.</p>
+              </div>
+            )}
+
+            <Button
+              size="lg"
+              className="w-full h-14 text-base font-bold bg-gradient-to-r from-primary to-primary/90 
+                       hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/25
+                       transition-all hover:scale-[1.02] active:scale-[0.98]"
+              disabled={loading || (paymentMethod === 'cash' && (!amountPaid || change < 0))}
+              onClick={handleCheckout}
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Memproses...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Receipt className="w-5 h-5" />
+                  Proses & Cetak Struk
+                </span>
+              )}
+            </Button>
+
+            {/* Alternative Print Options */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 gap-1.5"
+                onClick={handlePrintPreview}
+                disabled={items.length === 0}
+              >
+                <Printer className="w-4 h-4" />
+                Print Preview
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 gap-1.5"
+                onClick={() => {
+                  const paid = paymentMethod === 'cash' ? parseInt(amountPaid.replace(/\D/g, '')) : undefined
+                  import('@/lib/printer/thermal-usb').then(({ printThermalUSB }) => {
+                    printThermalUSB({
+                      storeName,
+                      cashierName,
+                      date: new Date().toLocaleString('id-ID'),
+                      items: items.map(item => ({
+                        name: item.item.name,
+                        qty: item.qty,
+                        price: item.item.selling_price
+                      })),
+                      total,
+                      paymentMethod,
+                      amountPaid: paid,
+                      change: paid ? paid - total : 0
+                    })
+                  })
+                }}
+                disabled={items.length === 0}
+              >
+                <Download className="w-4 h-4" />
+                Simpan Struk
+              </Button>
+            </div>
 
         {/* Clear Cart */}
         <button

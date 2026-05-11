@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { DashboardClient } from './DashboardClient'
 
 export default async function DashboardPage() {
-  await requireRole('admin', 'ketua')
+  await requireRole('superadmin', 'admin', 'ketua')
   const supabase = await createClient()
 
   const now = new Date()
