@@ -1,0 +1,30 @@
+import { NextResponse } from 'next/server'
+
+export async function GET() {
+  const manifest = {
+    name: 'GYMPOS - Koperasi Gym',
+    short_name: 'GYMPOS',
+    description: 'Sistem Point of Sale untuk Koperasi Gym',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#ffffff',
+    theme_color: '#0f172a',
+    orientation: 'portrait',
+    scope: '/',
+    icons: [
+      {
+        src: '/icons/icon-192x192.svg',
+        sizes: '192x192',
+        type: 'image/svg+xml'
+      },
+      {
+        src: '/icons/icon-512x512.svg',
+        sizes: '512x512',
+        type: 'image/svg+xml'
+      }
+    ],
+    categories: ['business', 'finance', 'productivity']
+  }
+
+  return NextResponse.json(manifest)
+}

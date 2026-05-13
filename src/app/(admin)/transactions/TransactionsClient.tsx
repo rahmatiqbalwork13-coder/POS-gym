@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { Wallet, Eye, Calendar, User, CreditCard, Banknote, ChevronLeft, ChevronRight, X, Package, Pencil, Trash2, Printer } from 'lucide-react'
+import { Wallet, Eye, Calendar, User, CreditCard, Banknote, ChevronLeft, ChevronRight, X, Package, Pencil, Trash2, Printer, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Transaction, TransactionItem, Role } from '@/types'
 
@@ -11,6 +11,16 @@ const formatDate = (dateStr: string) => {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const formatDateShort = (dateStr: string) => {
+  const date = new Date(dateStr)
+  return date.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -158,6 +168,22 @@ export function TransactionsClient() {
     setIsSaving(false)
   }
 
+  const handlePrintReprint = async (tx: TransactionWithProfile) => {
+    // Fetch full transaction details first
+    try {
+      const res = await fetch(`/api/transactions/${tx.id}`)
+      if (res.ok) {
+        const detail = await res.json()
+        handlePrint(detail)
+      } else {
+        alert('Gagal mengambil detail transaksi untuk cetak ulang')
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      alert('Gagal mencetak ulang')
+    }
+  }
+
   const handlePrint = (tx: TransactionDetail) => {
     const printWindow = window.open('', '_blank')
     if (!printWindow) return
@@ -259,14 +285,15 @@ export function TransactionsClient() {
   }
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Wallet className="size-5 text-primary" />
-          <h1 className="text-xl font-semibold">Daftar Transaksi</h1>
+          <h1 className="text-lg lg:text-xl font-semibold">Daftar Transaksi</h1>
         </div>
         {isSuperadmin && (
-          <div className="text-xs text-muted-foreground bg-primary/10 px-3 py-1 rounded-full">
+          <div className="text-xs text-muted-foreground bg-primary/10 px-3 py-1.5 rounded-full w-fit">
             Mode Superadmin - Edit, Hapus & Cetak Ulang Aktif
           </div>
         )}
@@ -292,7 +319,7 @@ export function TransactionsClient() {
                 <select
                   value={editForm.payment_method}
                   onChange={e => setEditForm(f => f ? { ...f, payment_method: e.target.value as 'cash' | 'transfer' } : f)}
-                  className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                  className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
                 >
                   <option value="cash">Tunai</option>
                   <option value="transfer">Transfer</option>
@@ -306,7 +333,7 @@ export function TransactionsClient() {
                   value={editForm.amount_paid}
                   onChange={e => setEditForm(f => f ? { ...f, amount_paid: e.target.value } : f)}
                   min={0}
-                  className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                  className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
                 />
               </div>
             </div>
@@ -324,18 +351,18 @@ export function TransactionsClient() {
       {/* Transaction Detail Modal */}
       {selectedTransaction && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-xl space-y-4">
+          <div className="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-4 lg:p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-lg">Detail Transaksi</h2>
+              <h2 className="font-semibold text-base lg:text-lg">Detail Transaksi</h2>
               <div className="flex items-center gap-2">
                 {isSuperadmin && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePrint(selectedTransaction)}
-                    className="gap-1.5"
+                    className="gap-1.5 hidden sm:flex"
                   >
-                    <Printer className="size-4" /> Cetak Ulang
+                    <Printer className="size-4" /> Cetak
                   </Button>
                 )}
                 <button 
@@ -352,18 +379,18 @@ export function TransactionsClient() {
             ) : (
               <div className="space-y-4">
                 {/* Transaction Info */}
-                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div className="grid grid-cols-2 gap-3 lg:gap-4 p-3 lg:p-4 bg-muted/50 rounded-lg">
                   <div>
                     <p className="text-xs text-muted-foreground">ID Transaksi</p>
                     <p className="font-medium text-sm">{selectedTransaction.id.slice(0, 8)}...</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Tanggal</p>
-                    <p className="font-medium">{formatDate(selectedTransaction.created_at)}</p>
+                    <p className="font-medium text-sm">{formatDate(selectedTransaction.created_at)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Kasir</p>
-                    <p className="font-medium">{selectedTransaction.profiles?.full_name || '-'}</p>
+                    <p className="font-medium text-sm">{selectedTransaction.profiles?.full_name || '-'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Metode Pembayaran</p>
@@ -373,7 +400,7 @@ export function TransactionsClient() {
                       ) : (
                         <CreditCard className="size-4 text-blue-600" />
                       )}
-                      <span className="font-medium capitalize">
+                      <span className="font-medium text-sm capitalize">
                         {selectedTransaction.payment_method === 'cash' ? 'Tunai' : 'Transfer'}
                       </span>
                     </div>
@@ -382,11 +409,26 @@ export function TransactionsClient() {
 
                 {/* Items */}
                 <div>
-                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                  <h3 className="font-medium mb-3 flex items-center gap-2 text-sm lg:text-base">
                     <Package className="size-4" />
                     Item yang Dibeli
                   </h3>
-                  <div className="border border-border rounded-lg overflow-hidden">
+                  
+                  {/* Mobile: Card View */}
+                  <div className="lg:hidden space-y-2">
+                    {selectedTransaction.transaction_items?.map((item) => (
+                      <div key={item.id} className="bg-muted/30 rounded-lg p-3 space-y-1">
+                        <p className="font-medium text-sm">{item.items?.name || '-'}</p>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{item.qty} x {currency(item.selling_price_at_time)}</span>
+                          <span className="font-medium text-foreground">{currency(item.selling_price_at_time * item.qty)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop: Table View */}
+                  <div className="hidden lg:block border border-border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
                       <thead className="bg-muted/50 border-b border-border">
                         <tr>
@@ -414,8 +456,8 @@ export function TransactionsClient() {
 
                 {/* Payment Summary */}
                 <div className="border-t border-border pt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total</span>
                     <span className="font-semibold text-lg">{currency(selectedTransaction.total_amount)}</span>
                   </div>
                   {selectedTransaction.amount_paid && selectedTransaction.amount_paid > 0 && (
@@ -431,18 +473,114 @@ export function TransactionsClient() {
                     </>
                   )}
                 </div>
+
+                {/* Mobile Print Button */}
+                {isSuperadmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePrint(selectedTransaction)}
+                    className="gap-1.5 w-full sm:hidden"
+                  >
+                    <Printer className="size-4" /> Cetak Ulang Struk
+                  </Button>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Table */}
+      {/* Content */}
       {loading ? (
-        <p className="text-sm text-muted-foreground">Memuat data...</p>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span className="ml-3 text-sm text-muted-foreground">Memuat data...</span>
+        </div>
       ) : (
         <>
-          <div className="border border-border rounded-xl overflow-hidden">
+          {/* Mobile: Card View */}
+          <div className="lg:hidden space-y-3">
+            {transactions.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Wallet className="size-12 mx-auto mb-3 opacity-20" />
+                <p>Belum ada transaksi.</p>
+              </div>
+            ) : (
+              transactions.map((tx) => (
+                <div key={tx.id} className="bg-card border border-border rounded-xl p-4 space-y-3">
+                  {/* Header */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-mono text-xs text-muted-foreground">#{tx.id.slice(0, 8).toUpperCase()}</p>
+                      <p className="text-sm font-medium">{formatDateShort(tx.created_at)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted">
+                      {tx.payment_method === 'cash' ? (
+                        <Banknote className="size-3.5 text-green-600" />
+                      ) : (
+                        <CreditCard className="size-3.5 text-blue-600" />
+                      )}
+                      <span className="text-xs capitalize">
+                        {tx.payment_method === 'cash' ? 'Tunai' : 'Transfer'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="size-4" />
+                    <span>{tx.profiles?.full_name || '-'}</span>
+                  </div>
+
+                  {/* Total & Actions */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className="text-lg font-bold">{currency(tx.total_amount)}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => viewDetail(tx.id)}
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+                        title="Lihat detail"
+                      >
+                        <Eye className="size-5" />
+                      </button>
+                      <button
+                        onClick={() => handlePrintReprint(tx)}
+                        className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                        title="Cetak ulang struk"
+                      >
+                        <Receipt className="size-5" />
+                      </button>
+                      {isSuperadmin && (
+                        <>
+                          <button
+                            onClick={() => openEdit(tx)}
+                            className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                            title="Edit"
+                          >
+                            <Pencil className="size-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tx.id)}
+                            className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                            title="Hapus"
+                          >
+                            <Trash2 className="size-5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop: Table View */}
+          <div className="hidden lg:block border border-border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b border-border">
                 <tr>
@@ -513,6 +651,13 @@ export function TransactionsClient() {
                           >
                             <Eye className="size-4" />
                           </button>
+                          <button
+                            onClick={() => handlePrintReprint(tx)}
+                            className="p-1.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                            title="Cetak ulang struk"
+                          >
+                            <Receipt className="size-4" />
+                          </button>
                           {isSuperadmin && (
                             <>
                               <button
@@ -541,16 +686,17 @@ export function TransactionsClient() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+            <p className="text-sm text-muted-foreground order-2 sm:order-1">
               Menampilkan {transactions.length} transaksi
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setOffset(Math.max(0, offset - limit))}
                 disabled={offset === 0}
+                className="flex-1 sm:flex-none"
               >
                 <ChevronLeft className="size-4 mr-1" /> Sebelumnya
               </Button>
@@ -559,6 +705,7 @@ export function TransactionsClient() {
                 size="sm"
                 onClick={() => setOffset(offset + limit)}
                 disabled={transactions.length < limit}
+                className="flex-1 sm:flex-none"
               >
                 Selanjutnya <ChevronRight className="size-4 ml-1" />
               </Button>
