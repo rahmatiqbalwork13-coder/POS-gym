@@ -277,16 +277,16 @@ export function ItemsClient() {
                 {/* Preview */}
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="relative w-24 h-24 rounded-xl border-2 border-dashed border-border bg-muted/50 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted transition-all overflow-hidden group"
+                  className="relative w-24 h-24 rounded-xl border-2 border-dashed border-border bg-white flex items-center justify-center cursor-pointer hover:border-primary/50 transition-all overflow-hidden group"
                 >
                   {previewUrl ? (
                     <>
                       <img 
                         src={previewUrl} 
                         alt="Preview" 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain p-1"
                       />
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <Camera className="w-6 h-6 text-white" />
                       </div>
                     </>
@@ -382,11 +382,13 @@ export function ItemsClient() {
                   {/* Header with Image */}
                   <div className="flex items-start gap-3">
                     {/* Product Image */}
-                    <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                    <div className="w-16 h-16 rounded-lg bg-white border border-border/50 flex items-center justify-center shrink-0 overflow-hidden">
                       {item.image_url ? (
-                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                        <img src={item.image_url} alt={item.name} className="w-full h-full object-contain p-1" />
                       ) : (
-                        <Package className="w-8 h-8 text-muted-foreground" />
+                        <div className="w-full h-full flex items-center justify-center bg-muted/30">
+                          <Package className="w-8 h-8 text-muted-foreground/50" />
+                        </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -437,9 +439,9 @@ export function ItemsClient() {
           </div>
 
           {/* Desktop: Table View */}
-          <div className="hidden lg:block border border-border rounded-xl overflow-hidden">
+          <div className="hidden lg:block border border-border rounded-xl overflow-hidden bg-card">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50 border-b border-border">
+              <thead className="bg-muted/30 border-b border-border">
                 <tr>
                   {['Foto', 'Nama Barang', 'Harga Beli', 'Harga Jual', 'Stok', 'Aksi'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -454,19 +456,21 @@ export function ItemsClient() {
                     {showLowStockOnly ? 'Tidak ada barang dengan stok rendah.' : 'Belum ada barang.'}
                   </td></tr>
                 ) : displayedItems.map(item => (
-                  <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={item.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                      <div className="w-14 h-14 rounded-lg bg-white border border-border/50 flex items-center justify-center overflow-hidden">
                         {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                          <img src={item.image_url} alt={item.name} className="w-full h-full object-contain p-1" />
                         ) : (
-                          <Package className="w-5 h-5 text-muted-foreground" />
+                          <div className="w-full h-full flex items-center justify-center bg-muted/30">
+                            <Package className="w-6 h-6 text-muted-foreground/50" />
+                          </div>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3 font-medium">{item.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{currency(item.purchase_price)}</td>
-                    <td className="px-4 py-3">{currency(item.selling_price)}</td>
+                    <td className="px-4 py-3 font-medium">{currency(item.selling_price)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className={`font-medium ${item.stock <= LOW_STOCK_THRESHOLD ? 'text-amber-600 dark:text-amber-400' : ''}`}>
@@ -483,10 +487,10 @@ export function ItemsClient() {
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(item)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
-                          <Pencil className="size-3.5" />
+                          <Pencil className="size-4" />
                         </button>
                         <button onClick={() => handleDelete(item.id, item.name)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
-                          <Trash2 className="size-3.5" />
+                          <Trash2 className="size-4" />
                         </button>
                       </div>
                     </td>
