@@ -349,11 +349,11 @@ export default function CashierPage() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 items-stretch">
                 {filteredProducts.map((product, index) => (
                   <div 
                     key={product.id} 
-                    className="stagger-item"
+                    className="stagger-item h-full"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <ProductCard item={product} onAdd={handleAdd} />

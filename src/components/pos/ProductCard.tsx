@@ -24,13 +24,14 @@ export function ProductCard({ item, onAdd }: ProductCardProps) {
   return (
     <button
       onClick={() => onAdd({ item, qty: 1 })}
-      className="group relative w-full text-left rounded-xl border border-border/50 bg-card 
+      className="group relative w-full h-full text-left rounded-xl border border-border/50 bg-card 
                  hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5
                  transition-all duration-200 ease-out
-                 hover:-translate-y-0.5 active:translate-y-0 overflow-hidden"
+                 hover:-translate-y-0.5 active:translate-y-0 overflow-hidden
+                 flex flex-col"
     >
       {/* Image Container - Portrait aspect ratio dengan background putih */}
-      <div className="relative aspect-[4/5] bg-white overflow-hidden">
+      <div className="relative aspect-[4/5] bg-white overflow-hidden shrink-0">
         {item.image_url ? (
           <img
             src={item.image_url}
@@ -62,15 +63,18 @@ export function ProductCard({ item, onAdd }: ProductCardProps) {
         )}
       </div>
 
-      {/* Content - lebih compact */}
-      <div className="p-3 border-t border-border/50">
-        {/* Nama Produk */}
-        <h3 className="font-medium text-sm text-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
+      {/* Content - flex grow untuk mengisi sisa ruang */}
+      <div className="p-3 border-t border-border/50 flex flex-col flex-1">
+        {/* Nama Produk - fixed height dengan line-clamp */}
+        <h3 className="font-medium text-sm text-foreground line-clamp-2 h-[2.5rem] group-hover:text-primary transition-colors">
           {item.name}
         </h3>
         
-        {/* Harga dan Stok dalam satu baris */}
-        <div className="flex items-center justify-between">
+        {/* Spacer untuk mendorong harga ke bawah */}
+        <div className="flex-1 min-h-[0.5rem]"></div>
+        
+        {/* Harga dan Stok - selalu di bawah */}
+        <div className="flex items-center justify-between pt-1">
           <p className="text-base font-bold text-primary tabular-nums">
             Rp{item.selling_price.toLocaleString('id-ID')}
           </p>
