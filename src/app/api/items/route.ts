@@ -1,43 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
-async function verifyAdmin() {
+// Roles allowed to write (create/update/delete) items
+const WRITE_ROLES = ['superadmin', 'admin', 'staff']
+// Roles that see purchase_price (full item data)
+const FULL_DATA_ROLES = ['superadmin', 'admin', 'staff']
+
+async function getRequester() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-
   const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  return profile?.role === 'admin' ? user : null
+    .from('profiles').select('role').eq('id', user.id).single()
+  if (!profile) return null
+  return { user, role: profile.role as string }
 }
 
 export async function GET() {
+  const requester = await getRequester()
+  if (!requester) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const canSeePurchasePrice = FULL_DATA_ROLES.includes(requester.role)
 
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
+  const { data, error } = await supabase
+    .from('items')
+    .select(canSeePurchasePrice
+      ? '*'
+      : 'id, name, selling_price, stock, category, image_url')
+    .order('name')
 
-  const isAdmin = profile?.role === 'admin'
-
-  const query = isAdmin
-    ? supabase.from('items').select('*').order('name')
-    : supabase.from('items').select('id, name, selling_price, stock').order('name')
-
-  const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json(data)
 }
 
 export async function POST(request: NextRequest) {
-  const user = await verifyAdmin()
-  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const requester = await getRequester()
+  if (!requester || !WRITE_ROLES.includes(requester.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const body = await request.json()
   const { name, purchase_price, selling_price, stock } = body
@@ -61,8 +62,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const user = await verifyAdmin()
-  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const requester = await getRequester()
+  if (!requester || !WRITE_ROLES.includes(requester.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const body = await request.json()
   const { id, name, purchase_price, selling_price, stock } = body
@@ -85,8 +88,10 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const user = await verifyAdmin()
-  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const requester = await getRequester()
+  if (!requester || !WRITE_ROLES.includes(requester.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')

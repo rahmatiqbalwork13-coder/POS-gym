@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gympos-v1';
+const CACHE_NAME = 'gympos-v2';
 const STATIC_ASSETS = [
   '/',
   '/dashboard',
@@ -6,6 +6,7 @@ const STATIC_ASSETS = [
   '/items',
   '/stock',
   '/transactions',
+  '/reports',
   '/login',
   '/manifest.json',
 ];
@@ -55,6 +56,19 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     caches.match(request).then((cached) => {
+      // Always fetch fresh JS/CSS files
+      if (request.url.includes('.js') || request.url.includes('.css')) {
+        return fetch(request).then((response) => {
+          if (response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return response;
+        }).catch(() => cached);
+      }
+      
       // Return cached version or fetch from network
       if (cached) {
         return cached;

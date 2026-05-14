@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
+const ALLOWED_ROLES = ['superadmin', 'admin', 'staff']
+
 async function verifyAdminOrSuperadmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -12,7 +14,7 @@ async function verifyAdminOrSuperadmin() {
     .eq('id', user.id)
     .single()
 
-  return profile?.role === 'admin' || profile?.role === 'superadmin' ? user : null
+  return profile?.role && ALLOWED_ROLES.includes(profile.role) ? user : null
 }
 
 // POST /api/stock/adjust - Adjust stock (in/out)

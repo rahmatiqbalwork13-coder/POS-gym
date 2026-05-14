@@ -44,10 +44,7 @@ export async function GET(request: NextRequest) {
     .limit(limit)
     .range(offset, offset + limit - 1)
 
-  // Staff can only see their own transactions
-  if (profile?.role === 'staff') {
-    query = query.eq('cashier_id', user.id)
-  }
+  // All authenticated roles now see all transactions
 
   const { data: transactions, error } = await query
 

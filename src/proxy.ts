@@ -3,8 +3,22 @@ import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 const PUBLIC_ROUTES = ['/login']
-const ADMIN_ONLY = ['/items', '/users']
-const KETUA_OR_ADMIN = ['/reports', '/dashboard']
+
+// Route → which roles are allowed (all others get redirected)
+const ROUTE_ROLES: { prefix: string; allowed: string[] }[] = [
+  { prefix: '/users',        allowed: ['superadmin', 'admin'] },
+  { prefix: '/items',        allowed: ['superadmin', 'admin', 'staff'] },
+  { prefix: '/stock',        allowed: ['superadmin', 'admin', 'staff'] },
+  { prefix: '/transactions', allowed: ['superadmin', 'admin', 'ketua', 'staff'] },
+  { prefix: '/reports',      allowed: ['superadmin', 'admin', 'ketua'] },
+  { prefix: '/dashboard',    allowed: ['superadmin', 'admin', 'ketua'] },
+  { prefix: '/cashier',      allowed: ['superadmin', 'admin', 'ketua', 'staff'] },
+]
+
+function redirectFor(role: string): string {
+  if (role === 'staff') return '/cashier'
+  return '/dashboard'
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -32,7 +46,6 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-
   const isPublic = PUBLIC_ROUTES.some(r => pathname.startsWith(r))
 
   if (!user && !isPublic) {
@@ -50,17 +63,11 @@ export async function proxy(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const role = profile?.role as string | undefined
+    const role = (profile?.role ?? 'staff') as string
 
-    const isAdminOnly = ADMIN_ONLY.some(r => pathname.startsWith(r))
-    const isKetuaOrAdmin = KETUA_OR_ADMIN.some(r => pathname.startsWith(r))
-
-    if (isAdminOnly && role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
-
-    if (isKetuaOrAdmin && role === 'staff') {
-      return NextResponse.redirect(new URL('/cashier', request.url))
+    const matchedRoute = ROUTE_ROLES.find(r => pathname.startsWith(r.prefix))
+    if (matchedRoute && !matchedRoute.allowed.includes(role)) {
+      return NextResponse.redirect(new URL(redirectFor(role), request.url))
     }
   }
 
