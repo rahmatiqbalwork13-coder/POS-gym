@@ -365,7 +365,7 @@ export default function CashierPage() {
         </div>
 
         {/* Cart Panel - Desktop: Always visible, Mobile: Toggleable */}
-        <div className={`${showCart ? 'fixed inset-0 z-40 bg-background lg:static lg:inset-auto' : 'hidden lg:flex'} w-full lg:w-[400px] border-l border-border/50 bg-card/30 backdrop-blur-sm flex-col shrink-0`}>
+        <div className={`${showCart ? 'fixed inset-0 z-40 bg-background lg:static lg:inset-auto' : 'hidden lg:flex'} w-full lg:w-[400px] lg:h-screen border-l border-border/50 bg-card/30 backdrop-blur-sm flex-col shrink-0`}>
           {/* Mobile Cart Header */}
           <div className="lg:hidden flex items-center justify-between p-3 border-b border-border/50 bg-card">
             <div className="flex items-center gap-2">
@@ -380,7 +380,7 @@ export default function CashierPage() {
             </button>
           </div>
           
-          <div className="p-3 sm:p-4 h-full overflow-hidden flex flex-col">
+          <div className="p-2 h-full overflow-hidden flex flex-col">
             <CartPanel
               items={cart}
               onQtyChange={handleQtyChange}
