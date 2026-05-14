@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { name, purchase_price, selling_price, stock } = body
+  const { name, purchase_price, selling_price, stock, image_url } = body
 
   if (!name || purchase_price == null || selling_price == null || stock == null) {
     return NextResponse.json({ error: 'Semua field wajib diisi.' }, { status: 400 })
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   const serviceClient = await createServiceClient()
   const { data, error } = await serviceClient
     .from('items')
-    .insert({ name, purchase_price, selling_price, stock })
+    .insert({ name, purchase_price, selling_price, stock, image_url })
     .select()
     .single()
 
@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { id, name, purchase_price, selling_price, stock } = body
+  const { id, name, purchase_price, selling_price, stock, image_url } = body
 
   if (!id) return NextResponse.json({ error: 'ID wajib diisi.' }, { status: 400 })
   if (Number(selling_price) <= Number(purchase_price)) {
@@ -78,7 +78,7 @@ export async function PUT(request: NextRequest) {
   const serviceClient = await createServiceClient()
   const { data, error } = await serviceClient
     .from('items')
-    .update({ name, purchase_price, selling_price, stock })
+    .update({ name, purchase_price, selling_price, stock, image_url })
     .eq('id', id)
     .select()
     .single()
@@ -98,8 +98,38 @@ export async function DELETE(request: NextRequest) {
   if (!id) return NextResponse.json({ error: 'ID wajib diisi.' }, { status: 400 })
 
   const serviceClient = await createServiceClient()
+  
+  // Get item image_url first to delete from storage
+  const { data: item } = await serviceClient
+    .from('items')
+    .select('image_url')
+    .eq('id', id)
+    .single()
+  
+  // Delete item from database
   const { error } = await serviceClient.from('items').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Postgres FK violation code 23503 — item still referenced in transaction_items
+    const msg = error.code === '23503'
+      ? 'Produk tidak bisa dihapus karena sudah digunakan dalam transaksi. Hapus transaksi terkait terlebih dahulu, atau biarkan produk ini sebagai arsip.'
+      : error.message
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+
+  // Delete image from storage if exists
+  if (item?.image_url) {
+    try {
+      const url = new URL(item.image_url)
+      const pathParts = url.pathname.split('/')
+      const filePath = pathParts.slice(pathParts.indexOf('product-images') + 1).join('/')
+      if (filePath) {
+        await serviceClient.storage.from('product-images').remove([filePath])
+      }
+    } catch (e) {
+      // Ignore error if image deletion fails
+      console.log('Failed to delete image:', e)
+    }
+  }
 
   return new NextResponse(null, { status: 204 })
 }

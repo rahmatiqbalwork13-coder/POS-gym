@@ -383,6 +383,66 @@ Dan policy tulis, items, transactions, dll. — jalankan di Supabase SQL Editor.
 
 ---
 
+## 16. Hapus Produk Diam-diam Gagal (Silent Delete Failure)
+
+**Konteks:** Superadmin klik Hapus di halaman Produk, konfirmasi OK, tapi produk tidak terhapus dan tidak ada pesan error.
+
+**Root Cause — dua lapisan:**
+
+1. **Client tidak mengecek response.**
+   ```ts
+   // ❌ Kode lama — response diabaikan
+   const handleDelete = async (id: string) => {
+     if (!confirm('Hapus barang ini?')) return
+     await fetch(`/api/items?id=${id}`, { method: 'DELETE' })
+     loadItems()  // dipanggil meskipun delete gagal
+   }
+   ```
+   Apapun yang dikembalikan API (200, 403, 500), client selalu memanggil `loadItems()`.
+   Hasilnya: data tidak berubah, tidak ada pesan error — seolah tidak terjadi apa-apa.
+
+2. **Foreign Key Constraint PostgreSQL (kode 23503).**
+   Tabel `transaction_items` memiliki kolom `item_id UUID REFERENCES items(id)` tanpa
+   `ON DELETE CASCADE`. Produk yang sudah pernah digunakan dalam transaksi **tidak bisa**
+   dihapus — PostgreSQL menolak dengan FK violation. API mengembalikan error tapi client
+   mengabaikannya (lihat poin 1).
+
+**Fix:**
+
+**`ItemsClient.tsx`** — cek `res.ok` dan tampilkan error:
+```ts
+const handleDelete = async (id: string, name: string) => {
+  if (!confirm(`Hapus barang "${name}"?`)) return
+  const res = await fetch(`/api/items?id=${id}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    alert(data.error || 'Gagal menghapus barang.')
+    return
+  }
+  loadItems()
+}
+```
+
+**`/api/items/route.ts`** — tangkap FK violation dan beri pesan yang dapat dipahami user:
+```ts
+if (error) {
+  const msg = error.code === '23503'
+    ? 'Produk tidak bisa dihapus karena sudah digunakan dalam transaksi...'
+    : error.message
+  return NextResponse.json({ error: msg }, { status: 500 })
+}
+```
+
+**Pelajaran:**
+- Selalu `await` dan cek `res.ok` pada setiap fetch mutasi (DELETE/POST/PUT).
+  Jangan panggil reload/state-update sebelum memastikan operasi berhasil.
+- Postgres FK violation = kode error `23503`. Deteksi ini dan terjemahkan ke
+  pesan yang ramah untuk user.
+- Produk yang sudah ada di transaksi sebaiknya tidak dihapus (merusak history laporan).
+  Pertimbangkan fitur "arsip/nonaktifkan" sebagai alternatif hard delete.
+
+---
+
 ## Pola Umum yang Perlu Diperhatikan
 
 | # | Pola | Catatan |
@@ -396,3 +456,4 @@ Dan policy tulis, items, transactions, dll. — jalankan di Supabase SQL Editor.
 | 7 | Gunakan CSS variable sidebar (`bg-sidebar`, `text-sidebar-foreground`) bukan card vars di dalam `<aside>` | Agar sidebar bisa di-theme independen dari konten utama |
 | 8 | Saat menambah role baru ke sistem: checklist 6 titik — DB constraint, proxy.ts, API verifyAdmin, Sidebar NAV_ITEMS, page requireRole, RLS policies | Lewatin satu → 403 atau redirect tak terduga |
 | 9 | Untuk admin operations yang butuh bypass RLS: pakai `createClient` dari `@supabase/supabase-js` bukan `createServerClient` dari `@supabase/ssr` | `@supabase/ssr` selalu menyertakan cookie session JWT yang membuat RLS tetap aktif |
+| 10 | Setiap fetch mutasi (DELETE/POST/PUT): selalu `await`, cek `res.ok`, tampilkan error sebelum reload | Silent fail = UX buruk dan debugging sulit |

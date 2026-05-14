@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Package, Pencil, Trash2, Plus, X, AlertTriangle, Filter } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Package, Pencil, Trash2, Plus, X, AlertTriangle, Filter, Camera, Upload, ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { createClient } from '@/lib/supabase/client'
 import type { Item } from '@/types'
 
 const currency = (n: number) => 'Rp' + n.toLocaleString('id-ID')
@@ -13,6 +14,7 @@ interface FormState {
   purchase_price: string
   selling_price: string
   stock: string
+  image_url?: string
 }
 
 const EMPTY_FORM: FormState = { name: '', purchase_price: '', selling_price: '', stock: '' }
@@ -24,6 +26,11 @@ export function ItemsClient() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
 
   const loadItems = async () => {
     setLoading(true)
@@ -35,10 +42,25 @@ export function ItemsClient() {
 
   useEffect(() => { loadItems() }, [])
 
+  // Cleanup preview URL when component unmounts or form closes
+  useEffect(() => {
+    return () => {
+      if (previewUrl && !previewUrl.startsWith('http')) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl])
+
   const lowStockItems = items.filter(item => item.stock <= LOW_STOCK_THRESHOLD)
   const displayedItems = showLowStockOnly ? lowStockItems : items
 
-  const openCreate = () => { setError(null); setForm(EMPTY_FORM) }
+  const openCreate = () => { 
+    setError(null)
+    setForm(EMPTY_FORM)
+    setSelectedFile(null)
+    setPreviewUrl(null)
+  }
+  
   const openEdit = (item: Item) => {
     setError(null)
     setForm({
@@ -47,36 +69,144 @@ export function ItemsClient() {
       purchase_price: String(item.purchase_price),
       selling_price: String(item.selling_price),
       stock: String(item.stock),
+      image_url: item.image_url || undefined,
     })
+    setSelectedFile(null)
+    setPreviewUrl(item.image_url || null)
+  }
+
+  const closeForm = () => {
+    setForm(null)
+    setSelectedFile(null)
+    if (previewUrl && !previewUrl.startsWith('http')) {
+      URL.revokeObjectURL(previewUrl)
+    }
+    setPreviewUrl(null)
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('File harus berupa gambar (JPG, PNG, WebP)')
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Ukuran file maksimal 5MB')
+      return
+    }
+
+    setSelectedFile(file)
+    
+    // Create preview
+    if (previewUrl && !previewUrl.startsWith('http')) {
+      URL.revokeObjectURL(previewUrl)
+    }
+    setPreviewUrl(URL.createObjectURL(file))
+    setError(null)
+  }
+
+  const uploadImage = async (file: File, itemId: string): Promise<string | null> => {
+    setUploadingImage(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${itemId}-${Date.now()}.${fileExt}`
+      const filePath = `products/${fileName}`
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        return null
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath)
+
+      return publicUrl
+    } catch (err) {
+      console.error('Error uploading image:', err)
+      return null
+    } finally {
+      setUploadingImage(false)
+    }
   }
 
   const handleSave = async () => {
     if (!form) return
-    setSaving(true); setError(null)
+    setSaving(true)
+    setError(null)
 
-    const body = {
-      id: form.id,
-      name: form.name,
-      purchase_price: Number(form.purchase_price),
-      selling_price: Number(form.selling_price),
-      stock: Number(form.stock),
+    try {
+      let imageUrl = form.image_url
+
+      // Upload new image if selected
+      if (selectedFile) {
+        // Generate temp ID for new items
+        const tempId = form.id || crypto.randomUUID()
+        const uploadedUrl = await uploadImage(selectedFile, tempId)
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl
+        } else {
+          setError('Gagal mengupload gambar. Silakan coba lagi.')
+          setSaving(false)
+          return
+        }
+      }
+
+      const body = {
+        id: form.id,
+        name: form.name,
+        purchase_price: Number(form.purchase_price),
+        selling_price: Number(form.selling_price),
+        stock: Number(form.stock),
+        image_url: imageUrl,
+      }
+
+      const res = await fetch('/api/items', {
+        method: form.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      
+      const data = await res.json()
+
+      if (!res.ok) { 
+        setError(data.error || 'Gagal menyimpan barang')
+        setSaving(false)
+        return 
+      }
+
+      closeForm()
+      loadItems()
+    } catch (err) {
+      setError('Terjadi kesalahan saat menyimpan')
+      console.error(err)
+    } finally {
+      setSaving(false)
     }
-
-    const res = await fetch('/api/items', {
-      method: form.id ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const data = await res.json()
-
-    if (!res.ok) { setError(data.error); setSaving(false); return }
-
-    setSaving(false); setForm(null); loadItems()
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Hapus barang ini?')) return
-    await fetch(`/api/items?id=${id}`, { method: 'DELETE' })
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Hapus barang "${name}"?`)) return
+    const res = await fetch(`/api/items?id=${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      alert(data.error || 'Gagal menghapus barang.')
+      return
+    }
     loadItems()
   }
 
@@ -133,12 +263,72 @@ export function ItemsClient() {
           <div className="bg-card border border-border rounded-xl w-full max-w-md p-4 lg:p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold">{form.id ? 'Edit Barang' : 'Tambah Barang'}</h2>
-              <button onClick={() => setForm(null)} className="text-muted-foreground hover:text-foreground">
+              <button onClick={closeForm} className="text-muted-foreground hover:text-foreground">
                 <X className="size-5" />
               </button>
             </div>
 
             {error && <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>}
+
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Foto Produk</label>
+              <div className="flex items-center gap-3">
+                {/* Preview */}
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative w-24 h-24 rounded-xl border-2 border-dashed border-border bg-muted/50 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted transition-all overflow-hidden group"
+                >
+                  {previewUrl ? (
+                    <>
+                      <img 
+                        src={previewUrl} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="w-6 h-6 text-white" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                      <ImageIcon className="w-6 h-6" />
+                      <span className="text-[10px]">Pilih Foto</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Button */}
+                <div className="flex-1 space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full gap-2"
+                    disabled={uploadingImage}
+                  >
+                    <Upload className="w-4 h-4" />
+                    {previewUrl ? 'Ganti Foto' : 'Upload Foto'}
+                  </Button>
+                  {selectedFile && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {selectedFile.name}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    Format: JPG, PNG, WebP. Maks: 5MB
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="space-y-4">
               {([
@@ -162,9 +352,9 @@ export function ItemsClient() {
             </div>
 
             <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={() => setForm(null)} className="flex-1 sm:flex-none">Batal</Button>
-              <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none">
-                {saving ? 'Menyimpan...' : 'Simpan'}
+              <Button variant="outline" onClick={closeForm} className="flex-1 sm:flex-none">Batal</Button>
+              <Button onClick={handleSave} disabled={saving || uploadingImage} className="flex-1 sm:flex-none">
+                {saving || uploadingImage ? 'Menyimpan...' : 'Simpan'}
               </Button>
             </div>
           </div>
@@ -189,16 +379,26 @@ export function ItemsClient() {
             ) : (
               displayedItems.map(item => (
                 <div key={item.id} className="bg-card border border-border rounded-xl p-4 space-y-3">
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <h3 className="font-medium text-sm lg:text-base flex-1 pr-2">{item.name}</h3>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className={`text-lg font-bold ${item.stock <= LOW_STOCK_THRESHOLD ? 'text-amber-600' : ''}`}>
-                        {item.stock}
-                      </span>
-                      {item.stock <= LOW_STOCK_THRESHOLD && (
-                        <AlertTriangle className="size-4 text-amber-600" />
+                  {/* Header with Image */}
+                  <div className="flex items-start gap-3">
+                    {/* Product Image */}
+                    <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package className="w-8 h-8 text-muted-foreground" />
                       )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm">{item.name}</h3>
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className={`text-lg font-bold ${item.stock <= LOW_STOCK_THRESHOLD ? 'text-amber-600' : ''}`}>
+                          {item.stock}
+                        </span>
+                        {item.stock <= LOW_STOCK_THRESHOLD && (
+                          <AlertTriangle className="size-4 text-amber-600" />
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -223,8 +423,8 @@ export function ItemsClient() {
                     >
                       <Pencil className="size-4" />
                     </button>
-                    <button 
-                      onClick={() => handleDelete(item.id)} 
+                    <button
+                      onClick={() => handleDelete(item.id, item.name)}
                       className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                       title="Hapus"
                     >
@@ -241,7 +441,7 @@ export function ItemsClient() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b border-border">
                 <tr>
-                  {['Nama Barang', 'Harga Beli', 'Harga Jual', 'Stok', 'Aksi'].map(h => (
+                  {['Foto', 'Nama Barang', 'Harga Beli', 'Harga Jual', 'Stok', 'Aksi'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       {h}
                     </th>
@@ -250,11 +450,20 @@ export function ItemsClient() {
               </thead>
               <tbody className="divide-y divide-border">
                 {displayedItems.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                     {showLowStockOnly ? 'Tidak ada barang dengan stok rendah.' : 'Belum ada barang.'}
                   </td></tr>
                 ) : displayedItems.map(item => (
                   <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package className="w-5 h-5 text-muted-foreground" />
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 font-medium">{item.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{currency(item.purchase_price)}</td>
                     <td className="px-4 py-3">{currency(item.selling_price)}</td>
@@ -276,7 +485,7 @@ export function ItemsClient() {
                         <button onClick={() => openEdit(item)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
                           <Pencil className="size-3.5" />
                         </button>
-                        <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                        <button onClick={() => handleDelete(item.id, item.name)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
                           <Trash2 className="size-3.5" />
                         </button>
                       </div>

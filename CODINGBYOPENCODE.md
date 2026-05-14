@@ -287,6 +287,50 @@ try {
 
 ---
 
+## 14. Upload Foto Produk
+
+**Konteks:** User ingin menambahkan foto produk saat input/edit barang.
+
+**Implementasi:**
+- **File Input**: Hidden input type="file" dengan ref, trigger via tombol
+- **Preview**: URL.createObjectURL untuk preview sebelum upload
+- **Upload**: Supabase Storage `product-images` bucket
+- **Path**: `products/{itemId}-{timestamp}.{ext}`
+- **Database**: Simpan public URL di field `image_url`
+
+**Components:**
+```tsx
+// File input hidden
+const fileInputRef = useRef<HTMLInputElement>(null)
+<input ref={fileInputRef} type="file" accept="image/*" className="hidden" />
+
+// Preview dengan object URL
+const previewUrl = URL.createObjectURL(file)
+<img src={previewUrl} />
+
+// Upload ke Supabase
+const { data, error } = await supabase.storage
+  .from('product-images')
+  .upload(`products/${fileName}`, file)
+```
+
+**Validasi:**
+- File type: `image/*` (JPG, PNG, WebP)
+- Max size: 5MB
+- Cleanup: `URL.revokeObjectURL(previewUrl)` saat unmount
+
+**Storage Setup:**
+- Create bucket: `product-images` (public)
+- RLS policies: Allow authenticated upload/update/delete, public read
+- Run migration: `007_create_product_images_bucket.sql`
+
+**Lesson:**
+- Gunakan `URL.createObjectURL` untuk preview tanpa upload
+- Selalu cleanup object URL untuk mencegah memory leak
+- Upload ke storage terpisah dari save database untuk handle error
+
+---
+
 ## Pola Umum yang Ditemukan
 
 | # | Pola | Solusi |
