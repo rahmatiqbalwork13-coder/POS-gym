@@ -331,6 +331,54 @@ const { data, error } = await supabase.storage
 
 ---
 
+## 15. Fix ChunkLoadError Setelah Deploy
+
+**Konteks:** Error 404 pada file `_next/static/chunks/*.js` setelah deployment, menyebabkan `ChunkLoadError`.
+
+**Penyebab:**
+- Service worker mencoba load chunks lama yang sudah tidak ada setelah rebuild
+- Browser cache menyimpan referensi ke file chunks yang sudah expired
+- Next.js Turbopack menggunakan nama file chunks yang berbeda setiap build
+
+**Solusi:**
+1. **Update Service Worker Cache Version:**
+   ```js
+   // public/sw.js
+   const CACHE_NAME = 'gympos-v3'; // Ganti versi setiap major update
+   ```
+
+2. **Skip Caching untuk Chunks:**
+   ```js
+   // Skip _next/static chunks - let browser handle them
+   if (request.url.includes('/_next/static/chunks/')) {
+     event.respondWith(
+       fetch(request).catch(() => caches.match(request))
+     );
+     return;
+   }
+   ```
+
+3. **Version Check di Client:**
+   ```tsx
+   // ServiceWorkerRegistration.tsx
+   const APP_VERSION = 'v3';
+   const storedVersion = localStorage.getItem('gympos-app-version');
+   
+   if (storedVersion && storedVersion !== APP_VERSION) {
+     // Clear caches dan reload
+     caches.keys().then(names => 
+       Promise.all(names.map(n => caches.delete(n)))
+     ).then(() => window.location.reload());
+   }
+   ```
+
+**Lesson:**
+- Jangan cache Next.js chunks di service worker
+- Selalu update cache version setelah deploy
+- Implementasi version check untuk force reload
+
+---
+
 ## Pola Umum yang Ditemukan
 
 | # | Pola | Solusi |
@@ -356,3 +404,4 @@ const { data, error } = await supabase.storage
 - [ ] Service worker cache name sudah diupdate jika perlu
 - [ ] Scroll area sudah bisa di-scroll
 - [ ] Icon yang digunakan sudah ada di bundle (cek Sidebar.tsx)
+- [ ] ChunkLoadError: Skip caching `_next/static/chunks/` di service worker
